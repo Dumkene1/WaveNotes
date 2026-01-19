@@ -25,6 +25,19 @@ It is designed for musicians, composers, game developers, animators, and audio c
 
 ---
 
+## 📸 Screenshots
+
+### Main Window
+![Main Window](assets/screenshots/sc1_transcribe.png)
+
+### Audio Separation
+![Audio Separation](assets/screenshots/sc2_audio_separation.png)
+
+
+
+
+
+
 ## 🧠 Technologies Used
 
 ### Machine Learning
