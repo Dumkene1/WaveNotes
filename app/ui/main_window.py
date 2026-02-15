@@ -215,6 +215,10 @@ class SeparationWorker(QObject):
                 })
                 return
 
+            # Remove Demucs nested output folder (e.g., out_root/htdemucs_6s/...)
+            # so the user only sees the final stem files in the chosen output folder.
+           
+
             # Best-effort cleanup of empty directories left by Demucs
             try:
                 dirs = sorted([d for d in out_root.rglob("*") if d.is_dir()], key=lambda d: len(str(d)), reverse=True)
@@ -1009,11 +1013,11 @@ class MainWindow(QMainWindow):
         if not input_path and hasattr(self, "lbl_audio_path"):
             input_path = self.lbl_audio_path.text().strip()
     
-        out_dir = (payload.get("output_dir") or "").strip()
+        out_dir = (payload.get("output_dir") or payload.get("out_dir") or payload.get("output") or "").strip()
         use_subfolder = bool(payload.get("use_subfolder", False))
         overwrite = bool(payload.get("overwrite", False))
         model = (payload.get("model") or "htdemucs_6s")
-        output_format = (payload.get("output_format") or "wav")
+        output_format = "mp3"  # MP3-only (WAV removed)
         flat_naming = bool(payload.get("flat_naming", True))
     
         if not input_path:
@@ -1037,13 +1041,21 @@ class MainWindow(QMainWindow):
             p = p2
             p.mkdir(parents=True, exist_ok=True)
     
-        # Update Options window UI (busy)
+        # Update Audio Separation window UI (busy)
         if getattr(self, "_sep_win", None):
             try:
-                self._sep_win.ed_out.setText(str(p))
-                self._sep_win.lbl_sep_status.setText("Separating…")
-                self._sep_win.progress_sep.setVisible(True)
-                self._sep_win.progress_sep.setRange(0, 0)
+                # Keep output folder field in sync (if present)
+                if hasattr(self._sep_win, "txt_output_dir"):
+                    self._sep_win.txt_output_dir.setText(str(p))
+                # Indeterminate progress (if supported by the window)
+                if hasattr(self._sep_win, "set_busy"):
+                    self._sep_win.set_busy(True, "Separating… this can take a while.")
+                elif hasattr(self._sep_win, "progress"):
+                    self._sep_win.progress.setVisible(True)
+                    self._sep_win.progress.setRange(0, 0)
+                if hasattr(self._sep_win, "lbl_status"):
+                    self._sep_win.lbl_status.setVisible(True)
+                    self._sep_win.lbl_status.setText("Separating… this can take a while.")
             except Exception:
                 pass
     
@@ -1076,11 +1088,24 @@ class MainWindow(QMainWindow):
     
         if getattr(self, "_sep_win", None):
             try:
-                self._sep_win.progress_sep.setVisible(False)
-                self._sep_win.lbl_sep_status.setText(
-                    f"Done. Stems saved to: {out_dir}" if ok else f"Separation failed: {err}"
-                )
-                self._sep_win._refresh_stems_from_folder()
+                # Stop busy indicator (if supported)
+                if hasattr(self._sep_win, "set_busy"):
+                    self._sep_win.set_busy(False, "")
+                elif hasattr(self._sep_win, "progress"):
+                    self._sep_win.progress.setVisible(False)
+
+                # Update status text (if present)
+                msg = (f"Done. Stems saved to: {out_dir}" if ok else f"Separation failed: {err}")
+                if hasattr(self._sep_win, "lbl_status"):
+                    self._sep_win.lbl_status.setVisible(True)
+                    self._sep_win.lbl_status.setText(msg)
+
+                # Optional refresh hook
+                if hasattr(self._sep_win, "_refresh_stems_from_folder"):
+                    try:
+                        self._sep_win._refresh_stems_from_folder(out_dir)
+                    except TypeError:
+                        self._sep_win._refresh_stems_from_folder()
             except Exception:
                 pass
     
